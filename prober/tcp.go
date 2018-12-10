@@ -15,8 +15,10 @@ package prober
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"regexp"
@@ -26,6 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	pconfig "github.com/prometheus/common/config"
 
+	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/blackbox_exporter/config"
 )
 
@@ -38,7 +41,7 @@ func dialTCP(ctx context.Context, target string, module config.Module, registry 
 		return nil, err
 	}
 
-	ip, _, err := chooseProtocol(module.TCP.IPProtocol, module.TCP.IPProtocolFallback, targetAddress, registry, logger)
+	ip, _, err := chooseProtocol(module.TCP.PreferredIPProtocol, targetAddress, registry, logger)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error resolving address", "err", err)
 		return nil, err
@@ -100,6 +103,12 @@ func ProbeTCP(ctx context.Context, target string, module config.Module, registry
 	})
 	registry.MustRegister(probeFailedDueToRegex)
 	deadline, _ := ctx.Deadline()
+
+	if module.TCP.AppProtocol == "MQTT" {
+		return dialMQTT(target, module, registry, logger)
+	} else if module.TCP.AppProtocol == "TLink" {
+		return dialTlink(target, module, registry, logger)
+	}
 
 	conn, err := dialTCP(ctx, target, module, registry, logger)
 	if err != nil {
@@ -189,6 +198,89 @@ func ProbeTCP(ctx context.Context, target string, module config.Module, registry
 			registry.MustRegister(probeSSLEarliestCertExpiry)
 			probeSSLEarliestCertExpiry.Set(float64(getEarliestCertExpiry(&state).Unix()))
 		}
+	}
+	return true
+}
+
+func dialMQTT(target string, module config.Module, registry *prometheus.Registry, logger log.Logger) bool {
+	targetAddress, port, err := net.SplitHostPort(target)
+	if err != nil {
+		level.Error(logger).Log("msg", "Error splitting target address and port", "err", err)
+		return false
+	}
+
+	targetUrl := "tcp://" + targetAddress + ":" + port
+	opts := MQTT.NewClientOptions().AddBroker(targetUrl)
+	opts.SetClientID(module.TCP.ClientID)
+	opts.SetUsername(module.TCP.UserName)
+	opts.SetPassword(module.TCP.PassWord)
+	opts.SetCleanSession(false)
+	c := MQTT.NewClient(opts)
+	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
+		if token.Wait() && token.Error() != nil {
+			level.Error(logger).Log("msg", "Error connect to mqtt server", "err", token.Error())
+			return false
+		}
+	} else {
+		level.Error(logger).Log("msg", "Error io timeout", "err", targetUrl)
+		return false
+	}
+
+	if c.IsConnected() {
+		c.Disconnect(5)
+	}
+	return true
+}
+
+func dialTlink(target string, module config.Module, registry *prometheus.Registry, logger log.Logger) bool {
+	targetAddress, port, err := net.SplitHostPort(target)
+	if err != nil {
+		level.Error(logger).Log("msg", "Error splitting target address and port", "err", err)
+		return false
+	}
+
+	targetUrl := "tcp://" + targetAddress + ":" + port
+
+	opts := MQTT.NewClientOptions().AddBroker(targetUrl)
+	opts.SetClientID(module.TCP.ClientID)
+
+	if module.TCP.UserName == "" {
+		var buffer bytes.Buffer
+		buffer.WriteString("\x00\x00\xA3\xA4")
+		buffer.WriteString("\x01")
+		buffer.WriteString("\x22\x55")
+		buffer.WriteString("\x00\x00\x00\x00\x5a\x71\x7c\x95")
+		buffer.WriteString("\x01")
+		buffer.WriteString("\x00\x35")
+		buffer.WriteString("\x00\x02\x09")
+		buffer.WriteString("\x01")
+		buffer.WriteString("\x00\x042.03")
+		buffer.WriteString("\x00\x04U880")
+
+		opts.SetUsername(base64.StdEncoding.EncodeToString([]byte(buffer.String())))
+	} else {
+		opts.SetUsername(base64.StdEncoding.EncodeToString([]byte(module.TCP.UserName)))
+	}
+
+	if module.TCP.PassWord == "" {
+		opts.SetPassword(base64.StdEncoding.EncodeToString([]byte("\x01\x00\x2bUHF6pITX6Fz8-NqRf1CY795cSAeAu8SUg4BWKjiJ-6c")))
+	} else {
+		opts.SetPassword(base64.StdEncoding.EncodeToString([]byte(module.TCP.PassWord)))
+	}
+	opts.SetCleanSession(true)
+	c := MQTT.NewClient(opts)
+	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
+		if token.Wait() && token.Error() != nil {
+			level.Error(logger).Log("msg", "Error connect to tlink server", "err", token.Error())
+			return false
+		}
+	} else {
+		level.Error(logger).Log("msg", "Error io timeout", "err", targetUrl)
+		return false
+	}
+
+	if c.IsConnected() {
+		c.Disconnect(5)
 	}
 	return true
 }

@@ -6,6 +6,14 @@ modules:
     prober: http
     http:
       method: POST
+  http_post_2xx_query:
+    prober: http
+    http:
+      method: GET
+      query: 'productId=1&searchValue=1&eventType=&startTime=&endTime=&pageNow=&pageSize='
+      masterkey: '03eabea2183743beafcf7910634629c1'
+      sdk: '0'
+      apiversion: '20181031202219'
   tcp_connect:
     prober: tcp
   pop3s_banner:

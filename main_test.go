@@ -17,7 +17,7 @@ import (
 
 var c = &config.Config{
 	Modules: map[string]config.Module{
-		"http_2xx": config.Module{
+		"http_2xx": {
 			Prober:  "http",
 			Timeout: 10 * time.Second,
 			HTTP: config.HTTPProbe{

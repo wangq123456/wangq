@@ -14,6 +14,7 @@
 package prober
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -25,9 +26,14 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -37,6 +43,9 @@ import (
 
 	"github.com/prometheus/blackbox_exporter/config"
 )
+
+const APP_KEY = "FKMM8pDwvvc"
+const APP_SECRET = "aoJzuLBDP0"
 
 func matchRegularExpressions(reader io.Reader, httpConfig config.HTTPProbe, logger log.Logger) bool {
 	body, err := ioutil.ReadAll(reader)
@@ -203,7 +212,7 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 		targetHost = targetURL.Host
 	}
 
-	ip, lookupTime, err := chooseProtocol(module.HTTP.IPProtocol, module.HTTP.IPProtocolFallback, targetHost, registry, logger)
+	ip, lookupTime, err := chooseProtocol(module.HTTP.PreferredIPProtocol, targetHost, registry, logger)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error resolving address", "err", err)
 		return false
@@ -262,7 +271,26 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 		body = strings.NewReader(httpConfig.Body)
 	}
 
-	request, err := http.NewRequest(httpConfig.Method, targetURL.String(), body)
+	//fuhongbo--deal with query parameters
+	var targetURLwithQuery string
+	var queryUrl bytes.Buffer
+	if httpConfig.Query != "" {
+		arrPara := strings.Split(httpConfig.Query, "&")
+		for i := 0; i < len(arrPara); i++ {
+			arrParaTemp := strings.Split(arrPara[i], "=")
+			if len(arrParaTemp) < 2 || arrParaTemp[0] == "" || arrParaTemp[1] == "" {
+				continue
+			}
+			queryUrl.WriteString(arrPara[i])
+			queryUrl.WriteString("&")
+		}
+		targetURLwithQuery = targetURL.String() + "?" + queryUrl.String()
+	} else {
+		targetURLwithQuery = targetURL.String()
+	}
+
+	//request, err := http.NewRequest(httpConfig.Method, targetURL.String(), body)
+	request, err := http.NewRequest(httpConfig.Method, targetURLwithQuery, body)
 	request.Host = origHost
 	request = request.WithContext(ctx)
 	if err != nil {
@@ -276,6 +304,64 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 			continue
 		}
 		request.Header.Set(key, value)
+	}
+
+	// fuhongbo add api monitor
+	if strings.Index(target, "ag-api") != -1 {
+		var buffer bytes.Buffer
+
+		nowTime := time.Now().UnixNano()/1e6 + handleEcho()
+		timestamp := strconv.FormatInt(nowTime, 10)
+		request.Header["application"] = []string{APP_KEY}
+		request.Header["timestamp"] = []string{timestamp}
+
+		if httpConfig.Sdk != "" {
+			request.Header["sdk"] = []string{httpConfig.Sdk}
+		}
+
+		if httpConfig.ApiVersion != "" {
+			request.Header["version"] = []string{httpConfig.ApiVersion}
+		}
+
+		buffer.WriteString(strings.Join([]string{"application", APP_KEY}, ":"))
+		buffer.WriteString("\n")
+		buffer.WriteString(strings.Join([]string{"timestamp", timestamp}, ":"))
+		buffer.WriteString("\n")
+
+		var masterKey string
+		if httpConfig.MasterKey != "" {
+			masterKey = httpConfig.MasterKey
+			request.Header["MasterKey"] = []string{masterKey}
+			buffer.WriteString(strings.Join([]string{"MasterKey", masterKey}, ":"))
+			buffer.WriteString("\n")
+		}
+
+		var queryParam string
+		if httpConfig.Query != "" {
+			queryParam = httpConfig.Query
+			arrPara := strings.Split(queryParam, "&")
+			sort.Strings(arrPara)
+			for i := 0; i < len(arrPara); i++ {
+				arrParaTemp := strings.Split(arrPara[i], "=")
+				if len(arrParaTemp) == 1 {
+					buffer.WriteString(strings.Join([]string{arrParaTemp[0], ""}, ":"))
+					buffer.WriteString("\n")
+					continue
+				}
+				buffer.WriteString(strings.Join([]string{arrParaTemp[0], arrParaTemp[1]}, ":"))
+				buffer.WriteString("\n")
+			}
+		}
+
+		if httpConfig.Body != "" {
+			buffer.WriteString(httpConfig.Body)
+			buffer.WriteString("\n")
+		}
+
+		sign := buffer.String()
+
+		request.Header["signature"] = []string{encryptHMAC(APP_SECRET, sign)}
+
 	}
 
 	level.Info(logger).Log("msg", "Making HTTP request", "url", request.URL.String(), "host", request.Host)
@@ -421,4 +507,30 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 	contentLengthGauge.Set(float64(resp.ContentLength))
 	redirectsGauge.Set(float64(redirects))
 	return
+}
+
+func handleEcho() int64 {
+	start := time.Now().UnixNano() / 1e6
+	url := "https://ag-api.ctwing.cn/echo"
+
+	req, _ := http.NewRequest("GET", url, nil)
+
+	res, _ := http.DefaultClient.Do(req)
+
+	defer res.Body.Close()
+
+	end := time.Now().UnixNano() / 1e6
+	xg := res.Header.Get("x-ag-timestamp")
+	serviceTime, _ := strconv.ParseInt(xg, 10, 64)
+
+	return serviceTime - (start+end)/2
+}
+
+func encryptHMAC(secret string, data string) string {
+	key := []byte(secret)
+	hash := hmac.New(sha1.New, key)
+	hash.Write([]byte(data))
+	mac := hash.Sum(nil)
+
+	return base64.StdEncoding.EncodeToString(mac)
 }
