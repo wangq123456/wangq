@@ -16,6 +16,22 @@ modules:
       apiversion: '20181031202219'
   tcp_connect:
     prober: tcp
+  tcp_connect_mqtt:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      clientid: "116f4484fd174d4e9374112a23cad5db"
+      username: "fhb"
+      password: "5sZdF1OEtdEbSWXS3CsdHuI1Ek2S3tM8CEjW72XRZ2k"
+      appprotocol: "MQTT"
+  tcp_connect_tlink:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      clientid: "10002141machinemonitor"
+      username: 
+      password: 
+      appprotocol: "TLink"
   pop3s_banner:
     prober: tcp
     tcp:
