@@ -273,11 +273,8 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 		opts.SetUsername(base64.StdEncoding.EncodeToString([]byte(module.TCP.UserName)))
 	}
 
-	if module.TCP.PassWord == "" {
-		opts.SetPassword(base64.StdEncoding.EncodeToString([]byte("\x01\x00\x2bUHF6pITX6Fz8-NqRf1CY795cSAeAu8SUg4BWKjiJ-6c")))
-	} else {
-		opts.SetPassword(base64.StdEncoding.EncodeToString([]byte(module.TCP.PassWord)))
-	}
+	opts.SetPassword(base64.StdEncoding.EncodeToString([]byte("\x01\x00\x2b" + module.TCP.PassWord)))
+
 	opts.SetCleanSession(true)
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
