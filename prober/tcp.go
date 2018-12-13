@@ -209,7 +209,13 @@ func dialMQTT(target string, module config.Module, registry *prometheus.Registry
 		return false
 	}
 
-	targetUrl := "tcp://" + targetAddress + ":" + port
+	var targetUrl string
+	if module.TCP.TLS {
+		targetUrl = "tls://" + targetAddress + ":" + port
+	} else {
+		targetUrl = "tcp://" + targetAddress + ":" + port
+	}
+
 	opts := MQTT.NewClientOptions().AddBroker(targetUrl)
 	opts.SetClientID(module.TCP.ClientID)
 	opts.SetUsername(module.TCP.UserName)
@@ -239,7 +245,12 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 		return false
 	}
 
-	targetUrl := "tcp://" + targetAddress + ":" + port
+	var targetUrl string
+	if module.TCP.TLS {
+		targetUrl = "tls://" + targetAddress + ":" + port
+	} else {
+		targetUrl = "tcp://" + targetAddress + ":" + port
+	}
 
 	opts := MQTT.NewClientOptions().AddBroker(targetUrl)
 	opts.SetClientID(module.TCP.ClientID)
