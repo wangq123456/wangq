@@ -11,7 +11,7 @@ modules:
     http:
       method: GET
       query: 'productId=1&searchValue=1&eventType=&startTime=&endTime=&pageNow=&pageSize='
-      masterkey: '03eabea2183743beafcf7910634629c1'
+      masterkey: 
       sdk: '0'
       apiversion: '20181031202219'
   tcp_connect:
@@ -22,8 +22,17 @@ modules:
     tcp:
       clientid: "116f4484fd174d4e9374112a23cad5db"
       username: "fhb"
-      password: "5sZdF1OEtdEbSWXS3CsdHuI1Ek2S3tM8CEjW72XRZ2k"
+      password: 
       appprotocol: "MQTT"
+  tcp_connect_mqtt_tls:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      clientid: "116f4484fd174d4e9374112a23cad5db"
+      username: "fhb"
+      password: 
+      appprotocol: "MQTT"
+      tls: true
   tcp_connect_tlink:
     prober: tcp
     timeout: 5s
@@ -32,6 +41,15 @@ modules:
       username: 
       password: 
       appprotocol: "TLink"
+  tcp_connect_tlink_tls:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      clientid: "10002141machinemonitor"
+      username: 
+      password: 
+      appprotocol: "TLink"
+      tls: true
   pop3s_banner:
     prober: tcp
     tcp:
