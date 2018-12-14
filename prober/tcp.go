@@ -33,7 +33,7 @@ import (
 	"github.com/prometheus/blackbox_exporter/config"
 )
 
-var loginStatus bool
+var msgInfo MQTT.Message
 
 func dialTCP(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) (net.Conn, error) {
 	var dialProtocol, dialTarget string
@@ -240,10 +240,13 @@ func dialMQTT(target string, module config.Module, registry *prometheus.Registry
 	if c.IsConnected() {
 		c.Disconnect(5)
 	}
+	time.Sleep(10 * time.Millisecond)
 	return true
 }
 
 func dialTlink(target string, module config.Module, registry *prometheus.Registry, logger log.Logger) bool {
+	var loginStatus bool
+
 	targetAddress, port, err := net.SplitHostPort(target)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error splitting target address and port", "err", err)
@@ -293,14 +296,14 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 		return false
 	}
 
-	time.Sleep(3 * time.Second) //sleep for deal with server message
-	return loginStatus
-}
-
-func on_message(c MQTT.Client, msg MQTT.Message) {
-	level.Debug(logger).Log("msg", "get tlink response", "topic", msg.Topic(), "payload%d", msg.Payload())
-	if msg != nil && msg.Topic() == "v1/dn/da" {
-		switch msg.Payload()[7] {
+	time.Sleep(5 * time.Second) //sleep for deal with server message
+	if msgInfo == nil {
+		level.Error(logger).Log("msg", "cannot get v1/dn/da response")
+		return false
+	}
+	level.Debug(logger).Log("msg", "get tlink response", "topic", msgInfo.Topic(), "payload%d", msgInfo.Payload())
+	if msgInfo != nil && msgInfo.Topic() == "v1/dn/da" {
+		switch msgInfo.Payload()[7] {
 		case 0:
 			level.Debug(logger).Log("msg", "login successfully")
 			loginStatus = true
@@ -315,5 +318,10 @@ func on_message(c MQTT.Client, msg MQTT.Message) {
 			level.Error(logger).Log("msg", "donot match")
 		}
 	}
+	time.Sleep(10 * time.Millisecond)
+	return loginStatus
+}
 
+func on_message(c MQTT.Client, msg MQTT.Message) {
+	msgInfo = msg
 }
