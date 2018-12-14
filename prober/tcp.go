@@ -306,13 +306,13 @@ func on_message(c MQTT.Client, msg MQTT.Message) {
 			loginStatus = true
 			c.Disconnect(5)
 		case 1:
-			level.ERROR(logger).Log("msg", "other reasons")
+			level.Error(logger).Log("msg", "other reasons")
 		case 2:
-			level.ERROR(logger).Log("msg", "subscription failure")
+			level.Error(logger).Log("msg", "subscription failure")
 		case 3:
-			level.ERROR(logger).Log("msg", "auth failure")
+			level.Error(logger).Log("msg", "auth failure")
 		default:
-			level.ERROR(logger).Log("msg", "donot match")
+			level.Error(logger).Log("msg", "donot match")
 		}
 	}
 
