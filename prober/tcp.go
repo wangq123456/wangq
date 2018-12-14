@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -31,6 +32,8 @@ import (
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/prometheus/blackbox_exporter/config"
 )
+
+var loginStatus bool
 
 func dialTCP(ctx context.Context, target string, module config.Module, registry *prometheus.Registry, logger log.Logger) (net.Conn, error) {
 	var dialProtocol, dialTarget string
@@ -221,6 +224,8 @@ func dialMQTT(target string, module config.Module, registry *prometheus.Registry
 	opts.SetUsername(module.TCP.UserName)
 	opts.SetPassword(module.TCP.PassWord)
 	opts.SetCleanSession(false)
+	//默认不传，paho使用MQTT 3.1.1连接服务端，如果连接报错，会再次用MQTT 3.1连接服务端；传值3，使用MQTT 3.1连接，让paho在连接失败的时候不再去重复连
+	opts.SetProtocolVersion(3)
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
 		if token.Wait() && token.Error() != nil {
@@ -276,6 +281,7 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 	opts.SetPassword(base64.StdEncoding.EncodeToString([]byte("\x01\x00\x2b" + module.TCP.PassWord)))
 
 	opts.SetCleanSession(true)
+	opts.SetDefaultPublishHandler(on_message)
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
 		if token.Wait() && token.Error() != nil {
@@ -287,8 +293,27 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 		return false
 	}
 
-	if c.IsConnected() {
-		c.Disconnect(5)
+	time.Sleep(3 * time.Second) //sleep for deal with server message
+	return loginStatus
+}
+
+func on_message(c MQTT.Client, msg MQTT.Message) {
+	level.Debug(logger).Log("msg", "get tlink response", "topic", msg.Topic(), "payload%d", msg.Payload())
+	if msg != nil && msg.Topic() == "v1/dn/da" {
+		switch msg.Payload()[7] {
+		case 0:
+			level.Debug(logger).Log("msg", "login successfully")
+			loginStatus = true
+			c.Disconnect(5)
+		case 1:
+			level.ERROR(logger).Log("msg", "other reasons")
+		case 2:
+			level.ERROR(logger).Log("msg", "subscription failure")
+		case 3:
+			level.ERROR(logger).Log("msg", "auth failure")
+		default:
+			level.ERROR(logger).Log("msg", "donot match")
+		}
 	}
-	return true
+
 }
