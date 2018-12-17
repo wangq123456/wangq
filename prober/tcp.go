@@ -206,7 +206,6 @@ func ProbeTCP(ctx context.Context, target string, module config.Module, registry
 }
 
 func dialMQTT(target string, module config.Module, registry *prometheus.Registry, logger log.Logger) bool {
-	var loginStatus bool
 	targetAddress, port, err := net.SplitHostPort(target)
 	if err != nil {
 		level.Error(logger).Log("msg", "Error splitting target address and port", "err", err)
