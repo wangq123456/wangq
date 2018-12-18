@@ -223,34 +223,28 @@ func dialMQTT(target string, module config.Module, registry *prometheus.Registry
 	opts.SetClientID(module.TCP.ClientID)
 	opts.SetUsername(module.TCP.UserName)
 	opts.SetPassword(module.TCP.PassWord)
-	opts.SetCleanSession(false)
+	opts.SetCleanSession(true)
 	//默认不传，paho使用MQTT 3.1.1连接服务端，如果连接报错，会再次用MQTT 3.1连接服务端；传值3，使用MQTT 3.1连接，让paho在连接失败的时候不再去重复连
 	opts.SetProtocolVersion(3)
+	opts.SetAutoReconnect(false)
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
 		if token.Wait() && token.Error() != nil {
 			level.Error(logger).Log("msg", "Error connect to mqtt server", "err", token.Error())
-			if c.IsConnected() {
-				c.Disconnect(250)
-			}
 			return false
 		}
 	} else {
 		level.Error(logger).Log("msg", "Error io timeout", "err", targetUrl)
-		if c.IsConnected() {
-			c.Disconnect(250)
-		}
 		return false
 	}
 
-	if c.IsConnected() {
-		c.Disconnect(250)
-	}
+	level.Debug(logger).Log("msg", "mqtt disconnect")
+	c.Disconnect(250)
 	return true
 }
 
 func dialTlink(target string, module config.Module, registry *prometheus.Registry, logger log.Logger) bool {
-	var loginStatus bool
+	var loginStatus = false
 
 	targetAddress, port, err := net.SplitHostPort(target)
 	if err != nil {
@@ -267,6 +261,9 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 
 	opts := MQTT.NewClientOptions().AddBroker(targetUrl)
 	opts.SetClientID(module.TCP.ClientID)
+	//默认不传，paho使用MQTT 3.1.1连接服务端，如果连接报错，会再次用MQTT 3.1连接服务端；传值3，使用MQTT 3.1连接，让paho在连接失败的时候不再去重复连
+	opts.SetProtocolVersion(3)
+	opts.SetAutoReconnect(false)
 
 	if module.TCP.UserName == "" {
 		var buffer bytes.Buffer
@@ -294,29 +291,16 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
 		if token.Wait() && token.Error() != nil {
 			level.Error(logger).Log("msg", "Error connect to tlink server", "err", token.Error())
-			if c.IsConnected() {
-				c.Disconnect(250)
-			}
-			return false
+			return loginStatus
 		}
 	} else {
 		level.Error(logger).Log("msg", "Error io timeout", "err", targetUrl)
-		if c.IsConnected() {
-			c.Disconnect(250)
-		}
-		return false
+		return loginStatus
 	}
 
 	time.Sleep(5 * time.Second) //sleep for deal with server message
-	if msgInfo == nil {
-		level.Error(logger).Log("msg", "cannot get v1/dn/da response")
-		if c.IsConnected() {
-			c.Disconnect(250)
-		}
-		return false
-	}
-	level.Debug(logger).Log("msg", "get tlink response", "topic", msgInfo.Topic(), "payload%d", msgInfo.Payload())
 	if msgInfo != nil && msgInfo.Topic() == "v1/dn/da" {
+		level.Debug(logger).Log("msg", "get tlink response", "payload", msgInfo.Payload())
 		switch msgInfo.Payload()[7] {
 		case 0:
 			level.Debug(logger).Log("msg", "login successfully")
@@ -330,11 +314,14 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 		default:
 			level.Error(logger).Log("msg", "donot match")
 		}
+	} else {
+		level.Error(logger).Log("msg", "Error publish timeout", "err", "get publish msg timeout")
+		c.Disconnect(250)
+		return loginStatus
 	}
 
-	if c.IsConnected() {
-		c.Disconnect(250)
-	}
+	level.Debug(logger).Log("msg", "tlink disconnect")
+	c.Disconnect(250)
 	return loginStatus
 }
 
