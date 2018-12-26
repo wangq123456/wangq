@@ -48,6 +48,7 @@ type Module struct {
 	TCP     TCPProbe      `yaml:"tcp,omitempty"`
 	ICMP    ICMPProbe     `yaml:"icmp,omitempty"`
 	DNS     DNSProbe      `yaml:"dns,omitempty"`
+	UDP     UDPProbe      `yaml:"udp,omitempty"`
 }
 
 type HTTPProbe struct {
@@ -86,6 +87,13 @@ type TCPProbe struct {
 	UserName            string           `yaml:"username,omitempty"`
 	PassWord            string           `yaml:"password,omitempty"`
 	AppProtocol         string           `yaml:"appprotocol,omitempty"`
+}
+
+type UDPProbe struct {
+	TLS         bool             `yaml:"tls,omitempty"`
+	TLSConfig   config.TLSConfig `yaml:"tls_config,omitempty"`
+	IMEI        string           `yaml:"imei,omitempty"`
+	AppProtocol string           `yaml:"appprotocol,omitempty"`
 }
 
 type ICMPProbe struct {
@@ -157,6 +165,15 @@ func (s *DNSProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (s *TCPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain TCPProbe
+	if err := unmarshal((*plain)(s)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (s *UDPProbe) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type plain UDPProbe
 	if err := unmarshal((*plain)(s)); err != nil {
 		return err
 	}
