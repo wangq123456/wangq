@@ -122,7 +122,8 @@ func probeHandler(w http.ResponseWriter, r *http.Request, c *config.Config, logg
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(probeSuccessGauge)
 	registry.MustRegister(probeDurationGauge)
-	success := prober(ctx, target, module, registry, sl)
+	//success := prober(ctx, target, module, registry, sl)
+	success := prober(ctx, target, module, registry, logger) //支持应用控制日志级别打印文件
 	duration := time.Since(start).Seconds()
 	probeDurationGauge.Set(duration)
 	if success {
