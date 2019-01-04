@@ -77,10 +77,27 @@ func dialLwm2m(target string, module config.Module, logger log.Logger) bool {
 		return false
 	}
 
-	if rv != nil && rv.Code != coap.Created {
-		level.Error(logger).Log("msg", "Response Code", "rv", rv.Code)
+	if rv != nil && rv.Code == 0 {
+		level.Info(logger).Log("msg", "Send Response Code", "Code", rv.Code)
+		rv, err := cp.Receive()
+		if err != nil {
+			level.Error(logger).Log("msg", "Receive Response Code", "err", err)
+			return false
+		}
+		if rv != nil && rv.Code != coap.Created {
+			level.Error(logger).Log("msg", "Receive Response Code", "rv", rv.Code)
+			return false
+		}
+	} else if rv != nil && rv.Code != coap.Created {
+		level.Error(logger).Log("msg", "Send Response Code", "rv", rv.Code)
 		return false
 	}
+	/*
+		if rv != nil && rv.Code != coap.Created {
+			level.Error(logger).Log("msg", "Response Code", "rv", rv.Code)
+			return false
+		}
+	*/
 
 	math_rand.Seed(time.Now().Unix())
 	dismsgId := math_rand.Intn(10000)
