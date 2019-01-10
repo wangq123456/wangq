@@ -42,7 +42,7 @@ func dialLwm2m(target string, module config.Module, logger log.Logger) bool {
 	randByteArr := make([]byte, 4)
 	_, err := crypt_rand.Read(randByteArr)
 	if err != nil {
-		level.Error(logger).Log("msg", "Error get rand byte", "err", err)
+		level.Error(logger).Log("msg", "[lwm2m]Error get rand byte", "err", err)
 		return false
 	}
 
@@ -67,29 +67,29 @@ func dialLwm2m(target string, module config.Module, logger log.Logger) bool {
 
 	cp, err := coap.Dial("udp", target)
 	if err != nil {
-		level.Error(logger).Log("msg", "Error dialing", "err", err)
+		level.Error(logger).Log("msg", "[lwm2m]Error dialing", "err", err)
 		return false
 	}
 
 	rv, err := cp.Send(req)
 	if err != nil {
-		level.Error(logger).Log("msg", "Error sending request", "err", err)
+		level.Error(logger).Log("msg", "[lwm2m]Error sending request", "err", err)
 		return false
 	}
 
 	if rv != nil && rv.Code == 0 {
-		level.Info(logger).Log("msg", "Send Response Code", "Code", rv.Code)
+		level.Info(logger).Log("msg", "[lwm2m]Send Response Code", "Code", rv.Code)
 		rv, err := cp.Receive()
 		if err != nil {
-			level.Error(logger).Log("msg", "Receive Response Code", "err", err)
+			level.Error(logger).Log("msg", "[lwm2m]Receive Response Code", "err", err)
 			return false
 		}
 		if rv != nil && rv.Code != coap.Created {
-			level.Error(logger).Log("msg", "Receive Response Code", "rv", rv.Code)
+			level.Error(logger).Log("msg", "[lwm2m]Receive Response Code", "rv", rv.Code)
 			return false
 		}
 	} else if rv != nil && rv.Code != coap.Created {
-		level.Error(logger).Log("msg", "Send Response Code", "rv", rv.Code)
+		level.Error(logger).Log("msg", "[lwm2m]Send Response Code", "rv", rv.Code)
 		return false
 	}
 	/*
@@ -111,12 +111,12 @@ func dialLwm2m(target string, module config.Module, logger log.Logger) bool {
 	disreq.SetPathString("/rd/" + module.UDP.IMEI)
 	disrv, err := cp.Send(disreq)
 	if err != nil {
-		level.Error(logger).Log("msg", "Error sending disconn request", "err", err)
+		level.Error(logger).Log("msg", "[lwm2m]Error sending disconn request", "err", err)
 		return false
 	}
 
 	if disrv != nil && disrv.Code != coap.Deleted {
-		level.Error(logger).Log("msg", "Response Code", "disrv", disrv.Code)
+		level.Error(logger).Log("msg", "[lwm2m]Response Code", "disrv", disrv.Code)
 		return false
 	}
 

@@ -208,7 +208,7 @@ func ProbeTCP(ctx context.Context, target string, module config.Module, registry
 func dialMQTT(target string, module config.Module, registry *prometheus.Registry, logger log.Logger) bool {
 	targetAddress, port, err := net.SplitHostPort(target)
 	if err != nil {
-		level.Error(logger).Log("msg", "Error splitting target address and port", "err", err)
+		level.Error(logger).Log("msg", "[MQTT]Error splitting target address and port", "err", err)
 		return false
 	}
 
@@ -230,11 +230,11 @@ func dialMQTT(target string, module config.Module, registry *prometheus.Registry
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
 		if token.Wait() && token.Error() != nil {
-			level.Error(logger).Log("msg", "Error connect to mqtt server", "err", token.Error())
+			level.Error(logger).Log("msg", "[MQTT]Error connect to server", "err", token.Error())
 			return false
 		}
 	} else {
-		level.Error(logger).Log("msg", "Error io timeout", "err", targetUrl)
+		level.Error(logger).Log("msg", "[MQTT]Error io timeout", "err", targetUrl)
 		return false
 	}
 
@@ -248,7 +248,7 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 
 	targetAddress, port, err := net.SplitHostPort(target)
 	if err != nil {
-		level.Error(logger).Log("msg", "Error splitting target address and port", "err", err)
+		level.Error(logger).Log("msg", "[tlink]Error splitting target address and port", "err", err)
 		return false
 	}
 
@@ -290,11 +290,11 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 	c := MQTT.NewClient(opts)
 	if token := c.Connect(); token.WaitTimeout(module.Timeout) {
 		if token.Wait() && token.Error() != nil {
-			level.Error(logger).Log("msg", "Error connect to tlink server", "err", token.Error())
+			level.Error(logger).Log("msg", "[tlink]Error connect to server", "err", token.Error())
 			return loginStatus
 		}
 	} else {
-		level.Error(logger).Log("msg", "Error io timeout", "err", targetUrl)
+		level.Error(logger).Log("msg", "[tlink]Error io timeout", "err", targetUrl)
 		return loginStatus
 	}
 
@@ -303,19 +303,19 @@ func dialTlink(target string, module config.Module, registry *prometheus.Registr
 		level.Debug(logger).Log("msg", "get tlink response", "payload", msgInfo.Payload())
 		switch msgInfo.Payload()[7] {
 		case 0:
-			level.Debug(logger).Log("msg", "login successfully")
+			level.Debug(logger).Log("msg", "[tlink]Connect result", "result", "login successfully")
 			loginStatus = true
 		case 1:
-			level.Error(logger).Log("msg", "other reasons")
+			level.Error(logger).Log("msg", "[tlink]Connect result", "result", "other reasons")
 		case 2:
-			level.Error(logger).Log("msg", "subscription failure")
+			level.Error(logger).Log("msg", "[tlink]Connect result", "result", "subscription failure")
 		case 3:
-			level.Error(logger).Log("msg", "auth failure")
+			level.Error(logger).Log("msg", "[tlink]Connect result", "result", "auth failure")
 		default:
-			level.Error(logger).Log("msg", "donot match")
+			level.Error(logger).Log("msg", "[tlink]Connect result", "result", "donot match")
 		}
 	} else {
-		level.Error(logger).Log("msg", "Error publish timeout", "err", "get publish msg timeout")
+		level.Error(logger).Log("msg", "[tlink]Error publish timeout", "err", "get publish msg timeout")
 		c.Disconnect(250)
 		return loginStatus
 	}
