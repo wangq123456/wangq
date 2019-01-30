@@ -51,7 +51,7 @@ func dialLwm2m(target string, module config.Module, logger log.Logger) bool {
 		Code:      coap.POST,
 		MessageID: uint16(msgId),
 		Token:     randByteArr,
-		//Payload:   []byte("</>;ct=11543,</1/0>,</3/0>,</4/0>,</5/0>,</7/0>,</19/0>,</19/1>"),
+		Payload:   []byte("</>;ct=11543,</1/0>,</3/0>"),
 	}
 	req.SetPathString("/rd")
 	req.AddOption(coap.ContentFormat, coap.AppLinkFormat)
